@@ -11,19 +11,13 @@
 #include <ESP32RotaryEncoder.h>
 
 #define DO_ENCODER_VCC -1
-#define DI_ENCODER_SW  -1 // connected to 32 but not handled by rotary encoder library
+#define DI_ENCODER_SW  32 // connected to 32 but not handled by rotary encoder library
 #define DI_ENCODER_B   15 // DT
 #define DI_ENCODER_A   35 // CLK
 
+const uint8_t LONG_PRESS = 500; // push button long press duration
+
 RotaryEncoder rotaryEncoder( DI_ENCODER_A, DI_ENCODER_B, DI_ENCODER_SW, DO_ENCODER_VCC );
-
-#define SHORT_PRESS_TIME 500 // 500 milliseconds
-// Variables will change:
-int lastState = LOW;  // the previous state from the input pin
-int currentState;     // the current reading from the input pin
-unsigned long pressedTime  = 0;
-unsigned long releasedTime = 0;
-
 /*rotary encoder end*/
 
 //#define DEBUG_SERIAL
@@ -32,17 +26,13 @@ unsigned long releasedTime = 0;
 
 // Width and height of sprite
 #define WIDTH  240
-#define HEIGHT 240
+#define HEIGHT 280
 
 #define ADC_CHANNEL   ADC1_CHANNEL_5  // GPIO33
 #define NUM_SAMPLES   1000            // number of samples
 #define I2S_NUM         (0)
 #define BUFF_SIZE 50000
 #define B_MULT BUFF_SIZE/NUM_SAMPLES
-#define BUTTON_Ok        32
-//#define BUTTON_Plus        15 	// now handled by the rotary encoder
-//#define BUTTON_Minus        35	// now handled by the rotary encoder
-#define BUTTON_Back        0		// was pin 34 - is handled by GPIO0/flash button
 
 TFT_eSPI    tft = TFT_eSPI();         // Declare object "tft"
 
@@ -140,15 +130,6 @@ void setup() {
   configure_i2s(1000000);
 
   setup_screen();
-
-  pinMode(BUTTON_Ok , INPUT);		// is handled by the rotary encoder push button like the micro switch before
-//  pinMode(BUTTON_Plus , INPUT);	// is handled by the rotary encoder
-//  pinMode(BUTTON_Minus , INPUT);	// is handled by the rotary encoder
-  pinMode(BUTTON_Back , INPUT);
-  attachInterrupt(BUTTON_Ok, btok, RISING);
-//  attachInterrupt(BUTTON_Plus, btplus, RISING);	// is handled by the rotary encoder library
-//  attachInterrupt(BUTTON_Minus, btminus, RISING);	// is handled by the rotary encoder library
-  attachInterrupt(BUTTON_Back, btback, RISING);
 
   characterize_adc();
 #ifdef DEBUG_BUF
@@ -291,40 +272,31 @@ void knobCallback( int value )
   //Serial.printf( "Value: %i\n", value );	// for debugging
 }
 
-void buttonCallback(){
-	//Serial.println( "boop!" );
-  if(rotaryEncoder.buttonPressed()){
-    // read the state of the switch/button:
-    //DI_ENCODER_SW
-    // read the state of the switch/button:
-    currentState = digitalRead(DI_ENCODER_SW);
-    if (lastState == HIGH && currentState == LOW)       // button is pressed
-      pressedTime = millis();
-    else if (lastState == LOW && currentState == HIGH) { // button is released
-      releasedTime = millis();
-
-      long pressDuration = releasedTime - pressedTime;
-      if ( pressDuration < SHORT_PRESS_TIME ){
-        //Serial.println("A short press is detected");
-        btnok = 1;
-      }
-      else {
-        //Serial.println("A long press is detected");
-        btnbk = 1;
-      }
-   }
-    // save the the last state
-    delay(25);
-    lastState = currentState;
-  }
-  
-  else {
-    btnok = 0;
-    btnbk = 0;
-  }
-  
+void buttonShortPress()
+{
+  btnbk = 0;
+  btnok = 1;
+	// Serial.println( "boop!" ); // for debugging
 }
 
+void buttonLongPress()
+{
+  btnok = 0;
+  btnbk = 1;
+  // Serial.println( "BOOOOOOOOOOP!" ); // for debugging
+}
+
+void buttonCallback( unsigned long duration )
+{
+	if( duration > LONG_PRESS )
+	{
+		buttonLongPress();
+	}
+	else
+	{
+		buttonShortPress();
+	}
+}
 /*rotary encoder end*/
 
 void loop() {}
